@@ -34,6 +34,8 @@ export interface RealtimeAudioProps {
   autoStart: boolean;
   temperature: number;
   turnDetectionThreshold: number;
+  showTranscript?: boolean;
+  title?: string;
 }
 
 // OpenAI Event Types

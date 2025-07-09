@@ -39,7 +39,9 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
     instructions = 'You are a helpful AI assistant.',
     autoStart = false,
     temperature = 0.8,
-    turnDetectionThreshold = 0.5
+    turnDetectionThreshold = 0.5,
+    showTranscript = false,
+    title = 'Real-time Audio Conversation'
   } = args as RealtimeAudioProps;
 
   // Component state
@@ -52,6 +54,9 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
     sessionId: null,
     connectionState: 'new'
   });
+
+  // Add state for tracking active response
+  const [hasActiveResponse, setHasActiveResponse] = useState(false);
 
   // Refs for WebRTC
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -76,6 +81,9 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
     (error: string) => {
       setState(prev => ({ ...prev, error, status: 'error' }));
       updateStreamlitValue(prev => ({ ...prev, error, status: 'error' }));
+    },
+    (hasActive: boolean) => {
+      setHasActiveResponse(hasActive);
     }
   ));
 
@@ -98,9 +106,14 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
 
   // Set Streamlit frame height and mark component as ready
   useEffect(() => {
-    Streamlit.setFrameHeight(400);
+    // Adjust height based on whether transcript is shown
+    const baseHeight = 220; // Height without transcript
+    const transcriptHeight = showTranscript ? 200 : 0; // Height of transcript section
+    const totalHeight = baseHeight + transcriptHeight;
+    
+    Streamlit.setFrameHeight(totalHeight);
     Streamlit.setComponentReady();
-  }, []);
+  }, [showTranscript]);
 
   // Handle connection state changes
   const handleConnectionStateChange = useCallback(() => {
@@ -233,7 +246,7 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
     console.log('Stopping conversation...');
     
     // Cancel any ongoing response
-    if (dataChannelRef.current) {
+    if (dataChannelRef.current && hasActiveResponse) {
       const cancelEvent = createResponseCancelEvent();
       sendEvent(dataChannelRef.current, cancelEvent);
     }
@@ -246,6 +259,7 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
       isPaused: false,
       connectionState: 'closed'
     }));
+    setHasActiveResponse(false);
     updateStreamlitValue(prev => ({ 
       ...prev, 
       status: 'idle', 
@@ -253,18 +267,18 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
       is_paused: false,
       connection_state: 'closed'
     }));
-  }, [updateStreamlitValue]);
+  }, [updateStreamlitValue, hasActiveResponse]);
 
   // Pause conversation
   const pauseConversation = useCallback(() => {
-    if (dataChannelRef.current) {
+    if (dataChannelRef.current && hasActiveResponse) {
       const cancelEvent = createResponseCancelEvent();
       sendEvent(dataChannelRef.current, cancelEvent);
     }
     
     setState(prev => ({ ...prev, isPaused: true }));
     updateStreamlitValue(prev => ({ ...prev, is_paused: true }));
-  }, [updateStreamlitValue]);
+  }, [updateStreamlitValue, hasActiveResponse]);
 
   // Resume conversation
   const resumeConversation = useCallback(() => {
@@ -288,6 +302,7 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
     peerConnectionRef.current = null;
     dataChannelRef.current = null;
     localStreamRef.current = null;
+    setHasActiveResponse(false);
   }, []);
 
   // Cleanup on unmount
@@ -316,12 +331,9 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
         borderRadius: '8px'
       }}>
         <div>
-          <h3 style={{ margin: 0, color: '#262730' }}>Real-time Audio Conversation</h3>
+          <h3 style={{ margin: 0, color: '#262730' }}>{title}</h3>
           <p style={{ margin: '5px 0 0 0', color: '#666', fontSize: '14px' }}>
             Status: <strong>{state.status}</strong>
-            {state.sessionId && (
-              <span> • Session: {state.sessionId.substring(0, 8)}...</span>
-            )}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -330,13 +342,15 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
               onClick={startConversation}
               disabled={disabled || !apiKey}
               style={{
-                padding: '8px 16px',
+                padding: '12px 20px',
                 backgroundColor: '#FF4B4B',
                 color: 'white',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 cursor: disabled || !apiKey ? 'not-allowed' : 'pointer',
-                opacity: disabled || !apiKey ? 0.5 : 1
+                opacity: disabled || !apiKey ? 0.5 : 1,
+                fontSize: '14px',
+                fontWeight: '500'
               }}
             >
               Start Conversation
@@ -350,12 +364,14 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
                   onClick={pauseConversation}
                   disabled={disabled}
                   style={{
-                    padding: '8px 16px',
+                    padding: '12px 20px',
                     backgroundColor: '#FFA500',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '4px',
-                    cursor: disabled ? 'not-allowed' : 'pointer'
+                    borderRadius: '6px',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
                   }}
                 >
                   Pause
@@ -365,12 +381,14 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
                   onClick={resumeConversation}
                   disabled={disabled}
                   style={{
-                    padding: '8px 16px',
+                    padding: '12px 20px',
                     backgroundColor: '#00D4AA',
                     color: 'white',
                     border: 'none',
-                    borderRadius: '4px',
-                    cursor: disabled ? 'not-allowed' : 'pointer'
+                    borderRadius: '6px',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500'
                   }}
                 >
                   Resume
@@ -381,12 +399,14 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
                 onClick={stopConversation}
                 disabled={disabled}
                 style={{
-                  padding: '8px 16px',
+                  padding: '12px 20px',
                   backgroundColor: '#666',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '4px',
-                  cursor: disabled ? 'not-allowed' : 'pointer'
+                  borderRadius: '6px',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500'
                 }}
               >
                 Stop
@@ -440,79 +460,82 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
         </div>
       </div>
 
-      {/* Transcript */}
-      <div style={{
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '15px',
-        minHeight: '200px',
-        maxHeight: '300px',
-        overflowY: 'auto',
-        backgroundColor: '#fafafa'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '10px'
+      {/* Transcript - Only show when showTranscript is true */}
+      {showTranscript && (
+        <div style={{
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          padding: '15px',
+          minHeight: '200px',
+          maxHeight: '300px',
+          overflowY: 'auto',
+          backgroundColor: '#fafafa'
         }}>
-          <h4 style={{ margin: 0, color: '#262730' }}>Conversation Transcript</h4>
-          {state.transcript.length > 0 && (
-            <button
-              onClick={clearTranscript}
-              style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                backgroundColor: '#666',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        
-        {state.transcript.length === 0 ? (
-          <p style={{ color: '#666', fontStyle: 'italic' }}>
-            No conversation yet. Start a conversation to see the transcript here.
-          </p>
-        ) : (
-          <div>
-            {state.transcript.map((item) => (
-              <div
-                key={item.id}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '10px'
+          }}>
+            <h4 style={{ margin: 0, color: '#262730' }}>Conversation Transcript</h4>
+            {state.transcript.length > 0 && (
+              <button
+                onClick={clearTranscript}
                 style={{
-                  marginBottom: '10px',
-                  padding: '8px',
+                  padding: '6px 12px',
+                  fontSize: '13px',
+                  backgroundColor: '#666',
+                  color: 'white',
+                  border: 'none',
                   borderRadius: '4px',
-                  backgroundColor: item.type === 'user' ? '#E3F2FD' : '#F3E5F5',
-                  borderLeft: `3px solid ${item.type === 'user' ? '#2196F3' : '#9C27B0'}`
+                  cursor: 'pointer',
+                  fontWeight: '500'
                 }}
               >
-                <div style={{ 
-                  fontSize: '12px', 
-                  color: '#666', 
-                  marginBottom: '4px',
-                  display: 'flex',
-                  justifyContent: 'space-between'
-                }}>
-                  <span>{item.type === 'user' ? 'You' : 'AI Assistant'}</span>
-                  <span>
-                    {item.status === 'in_progress' && '⏳ '}
-                    {new Date(item.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-                <div style={{ color: '#262730' }}>
-                  {item.content || (item.status === 'in_progress' ? 'Speaking...' : '')}
-                </div>
-              </div>
-            ))}
+                Clear
+              </button>
+            )}
           </div>
-        )}
-      </div>
+          
+          {state.transcript.length === 0 ? (
+            <p style={{ color: '#666', fontStyle: 'italic' }}>
+              No conversation yet. Start a conversation to see the transcript here.
+            </p>
+          ) : (
+            <div>
+              {state.transcript.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    marginBottom: '10px',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    backgroundColor: item.type === 'user' ? '#E3F2FD' : '#F3E5F5',
+                    borderLeft: `3px solid ${item.type === 'user' ? '#2196F3' : '#9C27B0'}`
+                  }}
+                >
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: '#666', 
+                    marginBottom: '4px',
+                    display: 'flex',
+                    justifyContent: 'space-between'
+                  }}>
+                    <span>{item.type === 'user' ? 'You' : 'AI Assistant'}</span>
+                    <span>
+                      {item.status === 'in_progress' && '⏳ '}
+                      {new Date(item.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <div style={{ color: '#262730' }}>
+                    {item.content || (item.status === 'in_progress' ? 'Speaking...' : '')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Hidden audio element for remote audio playback */}
       <audio

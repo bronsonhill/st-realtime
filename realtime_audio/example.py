@@ -93,7 +93,14 @@ with col1:
         if conversation_result.get("transcript"):
             st.subheader("Conversation Transcript")
             
-            for message in conversation_result["transcript"]:
+            # Sort transcript by timestamp to ensure correct chronological order
+            # If timestamps are equal, user messages come before assistant messages
+            sorted_transcript = sorted(
+                conversation_result["transcript"], 
+                key=lambda x: (x["timestamp"], 0 if x["type"] == "user" else 1)
+            )
+            
+            for message in sorted_transcript:
                 if message["type"] == "user":
                     st.chat_message("user").write(message["content"])
                 else:

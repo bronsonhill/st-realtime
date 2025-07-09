@@ -58,12 +58,21 @@ export function createResponseCancelEvent(): OpenAIEvent {
  * Send event through data channel
  */
 export function sendEvent(dataChannel: RTCDataChannel, event: OpenAIEvent): void {
+  if (!dataChannel) {
+    console.warn('Data channel is null, cannot send event:', event.type);
+    return;
+  }
+  
   if (dataChannel.readyState === 'open') {
-    const message = JSON.stringify(event);
-    console.log('Sending event:', event.type, event);
-    dataChannel.send(message);
+    try {
+      const message = JSON.stringify(event);
+      console.log('Sending event:', event.type, event);
+      dataChannel.send(message);
+    } catch (error) {
+      console.error('Failed to send event:', event.type, error);
+    }
   } else {
-    console.warn('Data channel not open, cannot send event:', event.type);
+    console.warn(`Data channel not open (state: ${dataChannel.readyState}), cannot send event:`, event.type);
   }
 }
 
@@ -124,12 +133,15 @@ export function handleTranscriptEvent(
           status: 'in_progress'
         };
       } else {
-        // Create new message
+        // Create new message - use timestamp slightly after the last user message
+        const lastUserMessage = transcript.filter(item => item.type === 'user').pop();
+        const baseTimestamp = lastUserMessage ? lastUserMessage.timestamp + 100 : Date.now();
+        
         const assistantMessage: ConversationItem = {
           id: messageId,
           type: 'assistant',
           content: event.delta || '',
-          timestamp: Date.now(),
+          timestamp: baseTimestamp,
           status: 'in_progress'
         };
         transcript.push(assistantMessage);
@@ -149,12 +161,15 @@ export function handleTranscriptEvent(
           status: 'completed'
         };
       } else {
-        // Create completed message if not found
+        // Create completed message if not found - use timestamp slightly after the last user message
+        const lastUserMessage = transcript.filter(item => item.type === 'user').pop();
+        const baseTimestamp = lastUserMessage ? lastUserMessage.timestamp + 100 : Date.now();
+        
         const assistantMessage: ConversationItem = {
           id: messageId,
           type: 'assistant',
           content: event.transcript || '',
-          timestamp: Date.now(),
+          timestamp: baseTimestamp,
           status: 'completed'
         };
         transcript.push(assistantMessage);
@@ -219,6 +234,16 @@ export function isErrorEvent(event: OpenAIEvent): boolean {
 }
 
 /**
+ * Check if error is a cancellation error that should be ignored
+ */
+export function isCancellationError(event: OpenAIEvent): boolean {
+  const errorMessage = extractErrorMessage(event);
+  return errorMessage.includes('Cancellation failed') || 
+         errorMessage.includes('no active response') ||
+         errorMessage.includes('cancellation');
+}
+
+/**
  * Extract error message from error events
  */
 export function extractErrorMessage(event: OpenAIEvent): string {
@@ -240,9 +265,11 @@ export function createEventHandlers(
   onTranscriptUpdate: (transcript: ConversationItem[]) => void,
   onStatusChange: (status: string) => void,
   onSessionId: (sessionId: string) => void,
-  onError: (error: string) => void
+  onError: (error: string) => void,
+  onActiveResponseChange: (hasActive: boolean) => void
 ) {
   let currentTranscript: ConversationItem[] = [];
+  let hasActiveResponse = false;
 
   return {
     handleEvent: (event: OpenAIEvent) => {
@@ -251,6 +278,13 @@ export function createEventHandlers(
       // Handle errors first
       if (isErrorEvent(event)) {
         const errorMessage = extractErrorMessage(event);
+        
+        // Ignore cancellation errors as they're expected when no response is active
+        if (isCancellationError(event)) {
+          console.log('Ignoring cancellation error:', errorMessage);
+          return;
+        }
+        
         onError(errorMessage);
         onStatusChange('error');
         return;
@@ -266,6 +300,19 @@ export function createEventHandlers(
       const status = getStatusFromEvent(event);
       if (status) {
         onStatusChange(status);
+      }
+
+      // Track active response state
+      const previousActiveState = hasActiveResponse;
+      if (event.type === 'response.audio_transcript.delta' || event.type === 'response.audio.delta') {
+        hasActiveResponse = true;
+      } else if (event.type === 'response.done' || event.type === 'response.audio_transcript.done') {
+        hasActiveResponse = false;
+      }
+      
+      // Notify if active response state changed
+      if (previousActiveState !== hasActiveResponse) {
+        onActiveResponseChange(hasActiveResponse);
       }
 
       // Handle transcript updates
