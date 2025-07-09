@@ -150,13 +150,12 @@ def realtime_audio_conversation(
     # dictionary.
     component_value = _component_func(
         prompt=prompt,
-        api_key=api_key,
+        apiKey=api_key,  # Convert to camelCase for frontend
         voice=voice,
         instructions=instructions,
-        auto_start=auto_start,
+        autoStart=auto_start,  # Convert to camelCase for frontend
         temperature=temperature,
-        turn_detection_threshold=turn_detection_threshold,
-        key=key,
+        turnDetectionThreshold=turn_detection_threshold,  # Convert to camelCase for frontend
         default={
             "transcript": [],
             "status": "idle",

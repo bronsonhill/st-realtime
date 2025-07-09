@@ -96,9 +96,10 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
     });
   }, []);
 
-  // Set Streamlit frame height
+  // Set Streamlit frame height and mark component as ready
   useEffect(() => {
     Streamlit.setFrameHeight(400);
+    Streamlit.setComponentReady();
   }, []);
 
   // Handle connection state changes

@@ -4,9 +4,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="streamlit-realtime-audio",
-    version="1.0.0",
-    author="AI Assistant",
+    name="streamlit_realtime_audio",
+    version="0.0.1",
+    author="Bronson Hill",
     author_email="bronson.hill@yahoo.com.au",
     description="Streamlit component for real-time audio conversation with OpenAI using WebRTC",
     long_description=long_description,

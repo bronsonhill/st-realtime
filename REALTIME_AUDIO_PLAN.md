@@ -213,3 +213,31 @@ realtime_audio/
 - Integration with Streamlit session state
 - Audio visualization (waveform/volume meters)
 - Export conversation transcripts
+
+# Conversation Summary
+
+## Problem
+You encountered a `ModuleNotFoundError: No module named 'realtime_audio'` when trying to run the Streamlit real-time audio component. The error occurred when executing `streamlit run example.py` from within the `realtime_audio` directory.
+
+## Root Cause
+The issue was with the package installation and Python path configuration:
+1. The `realtime_audio` package wasn't properly installed in the Python environment
+2. The package needed to be installed from the parent directory (`st-realtime`) rather than from within the `realtime_audio` directory
+3. Python couldn't find the module when running the Streamlit app
+
+## Solution Steps
+1. **Fixed package installation**: Installed the package from the correct directory using `pip install -e realtime_audio/` from the parent directory
+2. **Built frontend dependencies**: Ensured the React frontend was properly built with `npm install` and `npm run build`
+3. **Set correct Python path**: Used `PYTHONPATH` environment variable to ensure Python could locate the module
+
+## Final Working Command
+```bash
+PYTHONPATH=/Users/bronsonhill/Documents/Work\ \(UoM\)/Repositories/st-realtime streamlit run realtime_audio/example.py
+```
+
+## Result
+✅ The Streamlit app is now running successfully at:
+- **Local URL**: http://localhost:8502
+- **Network URL**: http://172.20.10.2:8502
+
+The real-time audio conversation component is now functional and ready for use with an OpenAI API key.
