@@ -94,10 +94,10 @@ with col1:
             st.subheader("Conversation Transcript")
             
             # Sort transcript by timestamp to ensure correct chronological order
-            # If timestamps are equal, user messages come before assistant messages
+            # Use stable sorting to maintain order for messages with same timestamp
             sorted_transcript = sorted(
                 conversation_result["transcript"], 
-                key=lambda x: (x["timestamp"], 0 if x["type"] == "user" else 1)
+                key=lambda x: x["timestamp"]
             )
             
             for message in sorted_transcript:

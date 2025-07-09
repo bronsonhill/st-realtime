@@ -133,15 +133,12 @@ export function handleTranscriptEvent(
           status: 'in_progress'
         };
       } else {
-        // Create new message - use timestamp slightly after the last user message
-        const lastUserMessage = transcript.filter(item => item.type === 'user').pop();
-        const baseTimestamp = lastUserMessage ? lastUserMessage.timestamp + 100 : Date.now();
-        
+        // Create new message - use current timestamp for proper ordering
         const assistantMessage: ConversationItem = {
           id: messageId,
           type: 'assistant',
           content: event.delta || '',
-          timestamp: baseTimestamp,
+          timestamp: Date.now(),
           status: 'in_progress'
         };
         transcript.push(assistantMessage);
@@ -161,15 +158,12 @@ export function handleTranscriptEvent(
           status: 'completed'
         };
       } else {
-        // Create completed message if not found - use timestamp slightly after the last user message
-        const lastUserMessage = transcript.filter(item => item.type === 'user').pop();
-        const baseTimestamp = lastUserMessage ? lastUserMessage.timestamp + 100 : Date.now();
-        
+        // Create completed message if not found - use current timestamp
         const assistantMessage: ConversationItem = {
           id: messageId,
           type: 'assistant',
           content: event.transcript || '',
-          timestamp: baseTimestamp,
+          timestamp: Date.now(),
           status: 'completed'
         };
         transcript.push(assistantMessage);

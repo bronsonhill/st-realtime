@@ -394,23 +394,6 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
                   Resume
                 </button>
               )}
-              
-              <button
-                onClick={stopConversation}
-                disabled={disabled}
-                style={{
-                  padding: '12px 20px',
-                  backgroundColor: '#666',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: disabled ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              >
-                Stop
-              </button>
             </>
           )}
         </div>
