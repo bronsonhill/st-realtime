@@ -251,6 +251,13 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
       sendEvent(dataChannelRef.current, cancelEvent);
     }
 
+    // Resume audio stream if paused before stopping
+    if (localStreamRef.current && state.isPaused) {
+      localStreamRef.current.getTracks().forEach(track => {
+        track.enabled = true;
+      });
+    }
+
     cleanup();
     setState(prev => ({ 
       ...prev, 
@@ -267,21 +274,40 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
       is_paused: false,
       connection_state: 'closed'
     }));
-  }, [updateStreamlitValue, hasActiveResponse]);
+  }, [updateStreamlitValue, hasActiveResponse, state.isPaused]);
 
   // Pause conversation
   const pauseConversation = useCallback(() => {
+    console.log('Pausing conversation...');
+    
+    // Cancel any ongoing response
     if (dataChannelRef.current && hasActiveResponse) {
       const cancelEvent = createResponseCancelEvent();
       sendEvent(dataChannelRef.current, cancelEvent);
     }
     
-    setState(prev => ({ ...prev, isPaused: true }));
-    updateStreamlitValue(prev => ({ ...prev, is_paused: true }));
+    // Pause local audio stream
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        track.enabled = false;
+      });
+    }
+    
+    setState(prev => ({ ...prev, isPaused: true, isRecording: false }));
+    updateStreamlitValue(prev => ({ ...prev, is_paused: true, is_recording: false }));
   }, [updateStreamlitValue, hasActiveResponse]);
 
   // Resume conversation
   const resumeConversation = useCallback(() => {
+    console.log('Resuming conversation...');
+    
+    // Resume local audio stream
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        track.enabled = true;
+      });
+    }
+    
     setState(prev => ({ ...prev, isPaused: false }));
     updateStreamlitValue(prev => ({ ...prev, is_paused: false }));
   }, [updateStreamlitValue]);
