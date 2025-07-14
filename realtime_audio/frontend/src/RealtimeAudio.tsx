@@ -486,35 +486,42 @@ const RealtimeAudio: React.FC<ComponentProps> = ({ args, disabled }) => {
             </p>
           ) : (
             <div>
-              {state.transcript.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    marginBottom: '10px',
-                    padding: '8px',
-                    borderRadius: '4px',
-                    backgroundColor: item.type === 'user' ? '#E3F2FD' : '#F3E5F5',
-                    borderLeft: `3px solid ${item.type === 'user' ? '#2196F3' : '#9C27B0'}`
-                  }}
-                >
-                  <div style={{ 
-                    fontSize: '12px', 
-                    color: '#666', 
-                    marginBottom: '4px',
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                  }}>
-                    <span>{item.type === 'user' ? 'You' : 'AI Assistant'}</span>
-                    <span>
-                      {item.status === 'in_progress' && '⏳ '}
-                      {new Date(item.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <div style={{ color: '#262730' }}>
-                    {item.content || (item.status === 'in_progress' ? 'Speaking...' : '')}
-                  </div>
-                </div>
-              ))}
+              {state.transcript
+                .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+                .map((item) => {
+                  // Debug logging
+                  console.log(`[Display] ${item.type} message: sequence=${item.sequence}, content="${item.content}"`);
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        marginBottom: '10px',
+                        padding: '8px',
+                        borderRadius: '4px',
+                        backgroundColor: item.type === 'user' ? '#E3F2FD' : '#F3E5F5',
+                        borderLeft: `3px solid ${item.type === 'user' ? '#2196F3' : '#9C27B0'}`
+                      }}
+                    >
+                      <div style={{ 
+                        fontSize: '12px', 
+                        color: '#666', 
+                        marginBottom: '4px',
+                        display: 'flex',
+                        justifyContent: 'space-between'
+                      }}>
+                        <span>{item.type === 'user' ? 'You' : 'AI Assistant'}</span>
+                        <span>
+                          {item.status === 'in_progress' && '⏳ '}
+                          {new Date(item.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div style={{ color: '#262730' }}>
+                        {item.content || (item.status === 'in_progress' ? 'Speaking...' : '')}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>

@@ -93,13 +93,19 @@ with col1:
         if conversation_result.get("transcript"):
             st.subheader("Conversation Transcript")
             
-            # Sort transcript by timestamp to ensure correct chronological order
-            # Use stable sorting to maintain order for messages with same timestamp
+            # Sort transcript by sequence to ensure correct chronological order
+            # Use stable sorting to maintain order for messages with same sequence
             sorted_transcript = sorted(
                 conversation_result["transcript"], 
-                key=lambda x: x["timestamp"]
+                key=lambda x: x.get("sequence", x.get("timestamp", 0))
             )
             
+            # Debug: Print the sorted transcript
+            st.write("**Debug Info:**")
+            for i, message in enumerate(sorted_transcript):
+                st.write(f"{i}: {message['type']} (seq={message.get('sequence', 'N/A')}): {message['content'][:50]}...")
+            
+            st.write("**Actual Display:**")
             for message in sorted_transcript:
                 if message["type"] == "user":
                     st.chat_message("user").write(message["content"])

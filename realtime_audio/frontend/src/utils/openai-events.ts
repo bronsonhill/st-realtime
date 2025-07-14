@@ -24,7 +24,7 @@ export function createSessionUpdateEvent(config: OpenAIRealtimeConfig): SessionU
         threshold: config.turnDetectionThreshold,
         prefix_padding_ms: 300,
         silence_duration_ms: 200,
-        create_response: true,
+        create_response: true, // Re-enable response creation
         interrupt_response: true
       },
       temperature: config.temperature
@@ -90,6 +90,19 @@ export function parseEvent(data: string): OpenAIEvent | null {
   }
 }
 
+// Global monotonically-increasing counter to ensure every message gets a
+// unique sequence number that reflects true arrival order. Because this
+// counter is module-level it persists across invocations of the event
+// handler closures.
+let globalSequenceCounter = 0;
+
+/**
+ * Helper to get the next sequence number.
+ */
+function nextSequence(): number {
+  return globalSequenceCounter++;
+}
+
 /**
  * Handle conversation transcript events
  */
@@ -98,23 +111,76 @@ export function handleTranscriptEvent(
   currentTranscript: ConversationItem[]
 ): ConversationItem[] {
   const transcript = [...currentTranscript];
+  
+  // NOTE: We now rely on a module-level counter (`nextSequence`) that strictly
+  // increases for every new message, making ordering deterministic and
+  // eliminating the need for ad-hoc fractional adjustments.
 
   switch (event.type) {
+    case 'input_audio_buffer.speech_started': {
+      // User started speaking – create a placeholder message so that user turn
+      // always appears before the assistant response, even if the assistant
+      // begins speaking before the transcription is finished.
+
+      // Skip if we already have an in-progress user message for the turn.
+      const existingIndex = transcript.findIndex(
+        (item) => item.type === 'user' && item.status === 'in_progress'
+      );
+
+      if (existingIndex === -1) {
+        const placeholderUser: ConversationItem = {
+          id: event.item_id || uuidv4(),
+          type: 'user',
+          content: '',
+          timestamp: Date.now(),
+          sequence: nextSequence(),
+          status: 'in_progress'
+        };
+
+        console.log(
+          `[Transcript] Placeholder user message created: sequence=${placeholderUser.sequence}`
+        );
+
+        transcript.push(placeholderUser);
+      }
+      break;
+    }
+
     case 'conversation.item.input_audio_transcription.completed': {
       // User speech transcript completed
-      const userMessage: ConversationItem = {
-        id: event.item_id || uuidv4(),
-        type: 'user',
-        content: event.transcript || '',
-        timestamp: Date.now(),
-        status: 'completed'
-      };
-      
-      // Replace or add user message
-      const existingIndex = transcript.findIndex(item => item.id === userMessage.id);
+      // Try to find an existing placeholder created during speech_started
+      const existingIndex = transcript.findIndex((item) =>
+        item.id === event.item_id || (item.type === 'user' && item.status === 'in_progress')
+      );
+
       if (existingIndex >= 0) {
-        transcript[existingIndex] = userMessage;
+        transcript[existingIndex] = {
+          ...transcript[existingIndex],
+          content: event.transcript || transcript[existingIndex].content,
+          status: 'completed'
+        };
+
+        // Ensure user message appears before assistant messages that might have
+        // Sequence numbers are globally ordered, so no further adjustment needed.
+        
+        console.log(
+          `[Transcript] Updated user placeholder: sequence=${transcript[existingIndex].sequence}, content="${event.transcript}"`
+        );
       } else {
+        // If no placeholder exists (edge-case) create a new completed user message
+        const userMessage: ConversationItem = {
+          id: event.item_id || uuidv4(),
+          type: 'user',
+          content: event.transcript || '',
+          timestamp: Date.now(),
+          sequence: nextSequence(),
+          status: 'completed'
+        };
+
+        console.log(
+          `[Transcript] User message (no placeholder): sequence=${userMessage.sequence}, content="${userMessage.content}"`
+        );
+
         transcript.push(userMessage);
       }
       break;
@@ -133,14 +199,18 @@ export function handleTranscriptEvent(
           status: 'in_progress'
         };
       } else {
-        // Create new message - use current timestamp for proper ordering
+        // Create new message - should always come after user input now
         const assistantMessage: ConversationItem = {
           id: messageId,
           type: 'assistant',
           content: event.delta || '',
           timestamp: Date.now(),
+          sequence: nextSequence(),
           status: 'in_progress'
         };
+        
+        console.log(`[Transcript] Assistant message: sequence=${assistantMessage.sequence}, content="${assistantMessage.content}"`);
+        
         transcript.push(assistantMessage);
       }
       break;
@@ -158,14 +228,18 @@ export function handleTranscriptEvent(
           status: 'completed'
         };
       } else {
-        // Create completed message if not found - use current timestamp
+        // Create completed message if not found
         const assistantMessage: ConversationItem = {
           id: messageId,
           type: 'assistant',
           content: event.transcript || '',
           timestamp: Date.now(),
+          sequence: nextSequence(),
           status: 'completed'
         };
+        
+        console.log(`[Transcript] Assistant message completed: sequence=${assistantMessage.sequence}, content="${assistantMessage.content}"`);
+        
         transcript.push(assistantMessage);
       }
       break;
@@ -267,7 +341,7 @@ export function createEventHandlers(
 
   return {
     handleEvent: (event: OpenAIEvent) => {
-      console.log('Processing event:', event.type);
+      console.log(`[Event] Processing event: ${event.type}`, event);
 
       // Handle errors first
       if (isErrorEvent(event)) {
@@ -312,6 +386,11 @@ export function createEventHandlers(
       // Handle transcript updates
       const newTranscript = handleTranscriptEvent(event, currentTranscript);
       if (newTranscript !== currentTranscript) {
+        console.log(`[Transcript] Updated transcript:`, newTranscript.map(item => ({
+          type: item.type,
+          sequence: item.sequence,
+          content: item.content.substring(0, 50) + '...'
+        })));
         currentTranscript = newTranscript;
         onTranscriptUpdate(newTranscript);
       }

@@ -86,6 +86,7 @@ def realtime_audio_conversation(
                     "type": "user" | "assistant",
                     "content": "Message content",
                     "timestamp": 1640995200000,
+                    "sequence": 0,
                     "status": "completed" | "in_progress"
                 },
                 ...

@@ -12,6 +12,7 @@ export interface ConversationItem {
   type: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  sequence: number;
   status: 'in_progress' | 'completed';
 }
 
